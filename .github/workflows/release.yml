@@ -1,6 +1,9 @@
 name: Release
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
@@ -14,15 +17,17 @@ permissions:
 jobs:
   release:
     runs-on: macos-15
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ env.RELEASE_TAG }}
       - name: Build app
         run: ./scripts/build-app.sh
       - name: Package app
         run: |
-          version="${{ inputs.tag }}"
+          version="$RELEASE_TAG"
           version="${version#v}"
           archive="dist/Codex-Meter-macOS-arm64-${version}.zip"
           ditto -c -k --sequesterRsrc --keepParent "dist/Codex Meter.app" "$archive"
@@ -46,9 +51,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ inputs.tag }}" \
+          gh release create "$RELEASE_TAG" \
             dist/Codex-Meter-macOS-arm64-*.zip \
             dist/SHA256SUMS.txt \
             --verify-tag \
-            --title "Codex Meter ${{ inputs.tag }}" \
+            --title "Codex Meter $RELEASE_TAG" \
             --notes-file /tmp/release-notes.md
