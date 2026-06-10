@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to publish
+        required: true
+        default: v1.0.0
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Build app
+        run: ./scripts/build-app.sh
+      - name: Package app
+        run: |
+          version="${{ inputs.tag }}"
+          version="${version#v}"
+          archive="dist/Codex-Meter-macOS-arm64-${version}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "dist/Codex Meter.app" "$archive"
+          shasum -a 256 "$archive" | tee dist/SHA256SUMS.txt
+      - name: Write release notes
+        run: |
+          cat > /tmp/release-notes.md <<'NOTES'
+          ## 中文
+
+          Codex Meter 首个公开版本：菜单栏双圆环显示 Codex 5 小时和 7 天剩余额度，支持分级颜色、重置时间、低额度通知、手动刷新和开机启动。
+
+          下载 ZIP，解压后将应用移入“应用程序”文件夹。首次运行可能需要右键应用并选择“打开”。
+
+          ## English
+
+          The first public release of Codex Meter, featuring dual menu bar rings for Codex 5-hour and 7-day usage, color levels, reset times, low-usage notifications, manual refresh, and launch at login.
+
+          Download the ZIP, extract it, and move the app to Applications. On first launch, you may need to right-click the app and choose **Open**.
+          NOTES
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.tag }}" \
+            dist/Codex-Meter-macOS-arm64-*.zip \
+            dist/SHA256SUMS.txt \
+            --verify-tag \
+            --title "Codex Meter ${{ inputs.tag }}" \
+            --notes-file /tmp/release-notes.md
