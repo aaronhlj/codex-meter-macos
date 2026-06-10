@@ -2,24 +2,14 @@ import Foundation
 import Testing
 @testable import CodexUsageCore
 
+@Test func usageSourceOnlySupportsRealtimeAppServer() {
+    #expect(UsageSource.allCases == [.appServer])
+}
+
 @Test func usageWindowClampsRemainingPercent() {
     #expect(UsageWindow(usedPercent: 7, windowMinutes: 300, resetsAt: nil).remainingPercent == 93)
     #expect(UsageWindow(usedPercent: 140, windowMinutes: 300, resetsAt: nil).remainingPercent == 0)
     #expect(UsageWindow(usedPercent: -5, windowMinutes: 300, resetsAt: nil).remainingPercent == 100)
-}
-
-@Test func localParserFindsLatestValidRateLimitEvent() throws {
-    let input = """
-    {"timestamp":"2026-06-10T10:00:00Z","type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":10,"window_minutes":300,"resets_at":1781089333},"secondary":{"used_percent":60,"window_minutes":10080,"resets_at":1781146054},"plan_type":"plus"}}}
-    this line is incomplete {
-    {"timestamp":"2026-06-10T10:02:00Z","type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":12,"window_minutes":300,"resets_at":1781089333},"secondary":{"used_percent":64,"window_minutes":10080,"resets_at":1781146054},"plan_type":"plus"}}}
-    """
-
-    let snapshot = try #require(LocalSessionParser.parseLatest(in: Data(input.utf8)))
-    #expect(snapshot.primary?.remainingPercent == 88)
-    #expect(snapshot.secondary?.remainingPercent == 36)
-    #expect(snapshot.planType == "plus")
-    #expect(snapshot.source == .localSession)
 }
 
 @Test func appServerParserPrefersCodexBucket() throws {
@@ -34,13 +24,17 @@ import Testing
     #expect(snapshot.source == .appServer)
 }
 
-@Test func mergerUsesNewestValidSnapshot() {
-    let old = UsageSnapshot(primary: nil, secondary: nil, planType: nil, source: .appServer, updatedAt: Date(timeIntervalSince1970: 100))
-    let local = UsageSnapshot(primary: UsageWindow(usedPercent: 20, windowMinutes: 300, resetsAt: nil), secondary: nil, planType: "plus", source: .localSession, updatedAt: Date(timeIntervalSince1970: 200))
+@Test func realtimeSnapshotStalenessUsesFifteenMinuteThreshold() {
+    let snapshot = UsageSnapshot(
+        primary: UsageWindow(usedPercent: 20, windowMinutes: 300, resetsAt: nil),
+        secondary: nil,
+        planType: "plus",
+        source: .appServer,
+        updatedAt: Date(timeIntervalSince1970: 200)
+    )
 
-    #expect(UsageMerger.newest(appServer: old, local: local) == local)
-    #expect(UsageMerger.isStale(local, now: Date(timeIntervalSince1970: 1_101)))
-    #expect(!UsageMerger.isStale(local, now: Date(timeIntervalSince1970: 1_099)))
+    #expect(UsageMerger.isStale(snapshot, now: Date(timeIntervalSince1970: 1_101)))
+    #expect(!UsageMerger.isStale(snapshot, now: Date(timeIntervalSince1970: 1_099)))
 }
 
 @Test func sparseAppServerUpdatePreservesMissingFields() {
@@ -115,42 +109,4 @@ import Testing
     #expect(SegmentedRing.activeSegments(remainingPercent: 50, segmentCount: 16) == 8)
     #expect(SegmentedRing.activeSegments(remainingPercent: 84, segmentCount: 16) == 14)
     #expect(SegmentedRing.activeSegments(remainingPercent: 100, segmentCount: 16) == 16)
-}
-
-@Test func localProviderChoosesNewestEventAcrossCandidateFiles() async throws {
-    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: directory) }
-
-    let newerEvent = directory.appendingPathComponent("newer-event.jsonl")
-    let newerMtime = directory.appendingPathComponent("newer-mtime.jsonl")
-    try Data(localEvent(timestamp: "2026-06-10T10:05:00Z", used: 12).utf8).write(to: newerEvent)
-    try Data(localEvent(timestamp: "2026-06-10T10:01:00Z", used: 40).utf8).write(to: newerMtime)
-    try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 100)], ofItemAtPath: newerEvent.path)
-    try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 200)], ofItemAtPath: newerMtime.path)
-
-    let snapshot = try await LocalSessionProvider(sessionsURL: directory, maximumFiles: 10).fetch()
-    #expect(snapshot.primary?.usedPercent == 12)
-}
-
-@Test func localProviderRetainsCachedSnapshotWhenNewTailHasNoUsageEvent() async throws {
-    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: directory) }
-
-    let file = directory.appendingPathComponent("active.jsonl")
-    try Data(localEvent(timestamp: "2026-06-10T10:05:00Z", used: 12).utf8).write(to: file)
-    let provider = LocalSessionProvider(sessionsURL: directory, maximumFiles: 1, tailBytes: 512)
-    #expect(try await provider.fetch().primary?.usedPercent == 12)
-
-    let handle = try FileHandle(forWritingTo: file)
-    try handle.seekToEnd()
-    try handle.write(contentsOf: Data((String(repeating: "x", count: 700) + "\n").utf8))
-    try handle.close()
-
-    #expect(try await provider.fetch().primary?.usedPercent == 12)
-}
-
-private func localEvent(timestamp: String, used: Int) -> String {
-    #"{"timestamp":"\#(timestamp)","type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":\#(used),"window_minutes":300}}}}"#
 }

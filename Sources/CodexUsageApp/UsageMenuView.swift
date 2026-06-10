@@ -18,7 +18,7 @@ struct UsageMenuView: View {
                         .font(.largeTitle)
                         .foregroundStyle(.secondary)
                     Text("暂无用量数据").font(.headline)
-                    Text(store.errorMessage ?? "请打开 Codex 使用一次，或点击立即刷新。")
+                    Text(store.errorMessage ?? "请确认 Codex 已登录并正在运行，然后点击立即刷新。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -67,7 +67,7 @@ struct UsageMenuView: View {
     private func metadata(_ snapshot: UsageSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             LabeledContent("套餐", value: snapshot.planType?.uppercased() ?? "未知")
-            LabeledContent("数据来源", value: snapshot.source == .appServer ? "Codex 实时服务" : "本地会话")
+            LabeledContent("数据来源", value: "Codex 实时服务")
             LabeledContent("最后更新", value: snapshot.updatedAt.formatted(date: .omitted, time: .standard))
             if store.isStale {
                 Label("数据超过 15 分钟，可能已经过期", systemImage: "clock.badge.exclamationmark")

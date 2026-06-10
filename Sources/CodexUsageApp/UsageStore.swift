@@ -12,9 +12,7 @@ final class UsageStore: ObservableObject {
     @Published var launchAtLogin = false
 
     private let appServer = CodexAppServerClient()
-    private let local = LocalSessionProvider()
     private var appServerSnapshot: UsageSnapshot?
-    private var localSnapshot: UsageSnapshot?
     private var notificationState = NotificationThresholdState()
     private var tasks: [Task<Void, Never>] = []
 
@@ -35,12 +33,6 @@ final class UsageStore: ObservableObject {
                 await self?.refreshOnline()
             }
         })
-        tasks.append(Task { [weak self] in
-            while !Task.isCancelled {
-                await self?.refreshLocal()
-                try? await Task.sleep(for: .seconds(10))
-            }
-        })
     }
 
     func stop() {
@@ -50,14 +42,7 @@ final class UsageStore: ObservableObject {
     }
 
     func refreshAll() async {
-        guard !isRefreshing else { return }
-        isRefreshing = true
-        async let online = result { try await self.appServer.fetch() }
-        async let localResult = result { try await self.local.fetch() }
-        let (onlineValue, localValue) = await (online, localResult)
-        applyOnline(onlineValue)
-        applyLocal(localValue)
-        isRefreshing = false
+        await refreshOnline()
     }
 
     func refreshOnline() async {
@@ -65,10 +50,6 @@ final class UsageStore: ObservableObject {
         isRefreshing = true
         applyOnline(await result { try await appServer.fetch() })
         isRefreshing = false
-    }
-
-    func refreshLocal() async {
-        applyLocal(await result { try await local.fetch() }, reportError: snapshot == nil)
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
@@ -95,7 +76,7 @@ final class UsageStore: ObservableObject {
 
     private func configurePushUpdates() {
         appServer.setSnapshotHandler { [weak self] snapshot in
-            Task { @MainActor in self?.accept(snapshot, online: true) }
+            Task { @MainActor in self?.accept(snapshot) }
         }
     }
 
@@ -116,34 +97,19 @@ final class UsageStore: ObservableObject {
 
     private func applyOnline(_ value: Result<UsageSnapshot, Error>) {
         switch value {
-        case .success(let snapshot): accept(snapshot, online: true)
+        case .success(let snapshot): accept(snapshot)
         case .failure(let error):
-            if snapshot == nil { errorMessage = "在线刷新失败：\(error.localizedDescription)" }
+            errorMessage = "实时服务连接失败：\(error.localizedDescription)"
         }
     }
 
-    private func applyLocal(_ value: Result<UsageSnapshot, Error>, reportError: Bool = true) {
-        switch value {
-        case .success(let snapshot): accept(snapshot, online: false)
-        case .failure(let error):
-            if reportError { errorMessage = "本地读取失败：\(error.localizedDescription)" }
-        }
-    }
-
-    private func accept(_ newSnapshot: UsageSnapshot, online: Bool) {
-        if online {
-            appServerSnapshot = appServerSnapshot.map {
-                UsageMerger.mergeSparse(base: $0, update: newSnapshot)
-            } ?? newSnapshot
-        } else {
-            localSnapshot = newSnapshot
-        }
-        snapshot = UsageMerger.newest(appServer: appServerSnapshot, local: localSnapshot)
-        if errorMessage?.hasPrefix("在线刷新失败") == true ||
-            errorMessage?.hasPrefix("本地读取失败") == true {
-            errorMessage = nil
-        }
-        notifyIfNeeded(newSnapshot)
+    private func accept(_ newSnapshot: UsageSnapshot) {
+        appServerSnapshot = appServerSnapshot.map {
+            UsageMerger.mergeSparse(base: $0, update: newSnapshot)
+        } ?? newSnapshot
+        snapshot = appServerSnapshot
+        if errorMessage?.hasPrefix("实时服务连接失败") == true { errorMessage = nil }
+        if let snapshot { notifyIfNeeded(snapshot) }
     }
 
     private func notifyIfNeeded(_ snapshot: UsageSnapshot) {

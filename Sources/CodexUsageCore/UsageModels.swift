@@ -1,8 +1,7 @@
 import Foundation
 
-public enum UsageSource: String, Codable, Sendable {
+public enum UsageSource: String, Codable, CaseIterable, Sendable {
     case appServer
-    case localSession
 }
 
 public enum UsageLevel: Equatable, Sendable {
@@ -81,13 +80,6 @@ public enum UsageMerger {
             source: update.source,
             updatedAt: update.updatedAt
         )
-    }
-
-    public static func newest(appServer: UsageSnapshot?, local: UsageSnapshot?) -> UsageSnapshot? {
-        [appServer, local]
-            .compactMap { $0 }
-            .filter(\.hasUsage)
-            .max { $0.updatedAt < $1.updatedAt }
     }
 
     public static func isStale(_ snapshot: UsageSnapshot, now: Date = Date()) -> Bool {

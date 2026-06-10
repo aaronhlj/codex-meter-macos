@@ -6,7 +6,7 @@ on:
       tag:
         description: Existing version tag to publish
         required: true
-        default: v1.0.0
+        default: v1.0.1
 
 permissions:
   contents: write
@@ -32,13 +32,13 @@ jobs:
           cat > /tmp/release-notes.md <<'NOTES'
           ## 中文
 
-          Codex Meter 首个公开版本：菜单栏双圆环显示 Codex 5 小时和 7 天剩余额度，支持分级颜色、重置时间、低额度通知、手动刷新和开机启动。
+          此版本移除了本地会话文件读取。Codex Meter 现在仅通过 Codex 实时服务获取 5 小时和 7 天额度数据。
 
           下载 ZIP，解压后将应用移入“应用程序”文件夹。首次运行可能需要右键应用并选择“打开”。
 
           ## English
 
-          The first public release of Codex Meter, featuring dual menu bar rings for Codex 5-hour and 7-day usage, color levels, reset times, low-usage notifications, manual refresh, and launch at login.
+          This release removes local session file access. Codex Meter now obtains 5-hour and 7-day usage data exclusively from the Codex real-time service.
 
           Download the ZIP, extract it, and move the app to Applications. On first launch, you may need to right-click the app and choose **Open**.
           NOTES

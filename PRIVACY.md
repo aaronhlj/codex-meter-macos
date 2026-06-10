@@ -5,13 +5,12 @@ Codex Meter 是一个在本机运行的 macOS 菜单栏应用。
 ## 应用会访问的数据
 
 - 通过本机 Codex app-server 获取账户套餐、额度百分比和额度重置时间。
-- 读取 `~/.codex/sessions` 下最近更新的会话文件尾部，用于获取本地用量事件。应用只解析额度相关字段，不展示或保存提示词及回复正文。
 - 在 macOS `UserDefaults` 中保存开机启动偏好和通知去重状态。
 
 ## 网络与数据共享
 
 - 应用自身不包含统计分析、广告或第三方遥测代码。
-- 应用不会读取或复制 `~/.codex/auth.json`，也不会收集 API Key、访问令牌或账户密码。
+- 应用不会读取或复制 `~/.codex/sessions` 和 `~/.codex/auth.json`，也不会收集 API Key、访问令牌或账户密码。
 - 应用不会自行把提示词、会话内容或账户凭据上传到开发者或第三方服务。
 - Codex app-server 作为 Codex 的一部分，可能按 Codex 自身的工作方式与 OpenAI 服务通信；这不由 Codex Meter 额外实现。
 

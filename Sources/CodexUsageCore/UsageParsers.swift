@@ -73,34 +73,6 @@ private extension KeyedDecodingContainer where Key == DynamicKey {
     }
 }
 
-public enum LocalSessionParser {
-    public static func parseLatest(in data: Data) -> UsageSnapshot? {
-        var latest: UsageSnapshot?
-        let decoder = JSONDecoder()
-        let formatter = ISO8601DateFormatter()
-
-        for line in data.split(separator: 0x0A) {
-            guard
-                let object = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
-                let timestamp = object["timestamp"] as? String,
-                let date = formatter.date(from: timestamp),
-                let payload = object["payload"] as? [String: Any],
-                payload["type"] as? String == "token_count",
-                let rateLimits = payload["rate_limits"],
-                JSONSerialization.isValidJSONObject(rateLimits),
-                let rateData = try? JSONSerialization.data(withJSONObject: rateLimits),
-                let wire = try? decoder.decode(WireSnapshot.self, from: rateData)
-            else { continue }
-
-            let snapshot = wire.model(source: .localSession, updatedAt: date)
-            if snapshot.hasUsage, latest == nil || snapshot.updatedAt > latest!.updatedAt {
-                latest = snapshot
-            }
-        }
-        return latest
-    }
-}
-
 public enum AppServerUsageParser {
     public static func parseResult(_ data: Data, receivedAt: Date = Date()) throws -> UsageSnapshot {
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
