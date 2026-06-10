@@ -1,0 +1,39 @@
+name: Bug report / 问题报告
+description: Report reproducible incorrect behavior / 报告可复现的问题
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Please remove personal data from screenshots and logs. 请先删除截图和日志中的个人信息。
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version / macOS 版本
+    validations:
+      required: true
+  - type: input
+    id: codex
+    attributes:
+      label: Codex installation / Codex 安装方式
+      placeholder: Desktop app or CLI version
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / 复现步骤
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior / 预期行为
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior / 实际行为
+    validations:
+      required: true
