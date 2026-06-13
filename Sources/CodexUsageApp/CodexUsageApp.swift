@@ -22,7 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
 
-        let item = NSStatusBar.system.statusItem(withLength: 84)
+        let item = NSStatusBar.system.statusItem(withLength: StatusItemMetrics.width)
         statusItem = item
         if let button = item.button {
             button.imagePosition = .imageOnly
@@ -34,7 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         popover.behavior = .transient
         popover.animates = true
-        popover.contentSize = NSSize(width: 330, height: 520)
+        popover.contentSize = StatusItemMetrics.popoverSize
         popover.contentViewController = NSHostingController(rootView: UsageMenuView(store: store))
 
         store.$snapshot

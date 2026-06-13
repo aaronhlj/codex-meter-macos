@@ -2,55 +2,120 @@ import AppKit
 import CodexUsageCore
 import SwiftUI
 
+enum StatusItemMetrics {
+    static let width: CGFloat = 58
+    static let popoverSize = NSSize(width: 300, height: 250)
+}
+
 enum StatusItemImageFactory {
-    private static let imageSize = NSSize(width: 76, height: 22)
-    private static let segmentCount = 16
+    private static let imageSize = NSSize(width: 50, height: 22)
 
     static func make(snapshot: UsageSnapshot?) -> NSImage {
         let image = NSImage(size: imageSize, flipped: false) { _ in
-            drawMeter(label: "5h", percent: snapshot?.primary?.remainingPercent, originX: 0)
-            drawMeter(label: "7d", percent: snapshot?.secondary?.remainingPercent, originX: 39)
+            drawDial(percent: snapshot?.primary?.remainingPercent, centerX: 12)
+            drawDial(percent: snapshot?.secondary?.remainingPercent, centerX: 38)
             return true
         }
         image.isTemplate = false
         return image
     }
 
-    private static func drawMeter(label: String, percent: Int?, originX: CGFloat) {
-        let labelAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: 7.5, weight: .semibold),
-            .foregroundColor: NSColor.labelColor,
-        ]
-        NSString(string: label).draw(at: NSPoint(x: originX, y: 7), withAttributes: labelAttributes)
+    private static func drawDial(percent: Int?, centerX: CGFloat) {
+        let center = NSPoint(x: centerX, y: 11)
+        let radius: CGFloat = 8
 
-        let center = NSPoint(x: originX + 25.5, y: 11)
-        let activeCount = SegmentedRing.activeSegments(
-            remainingPercent: percent,
-            segmentCount: segmentCount
-        )
-        let activeColor = percent.map { NSColor(UsageLevel(remainingPercent: $0)) }
+        let track = NSBezierPath()
+        track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
+        track.lineWidth = 2
+        track.lineCapStyle = .round
+        NSColor.secondaryLabelColor.withAlphaComponent(0.22).setStroke()
+        track.stroke()
 
-        for index in 0..<segmentCount {
-            let start = 90 - CGFloat(index) * 360 / CGFloat(segmentCount)
-            let end = start - 14
-            let path = NSBezierPath()
-            path.appendArc(withCenter: center, radius: 8.5, startAngle: start, endAngle: end, clockwise: true)
-            path.lineWidth = 2.6
-            path.lineCapStyle = .butt
-            (index < activeCount ? activeColor : NSColor.secondaryLabelColor.withAlphaComponent(0.25))?.setStroke()
-            path.stroke()
+        let clamped = percent.map { min(100, max(0, $0)) }
+        if let clamped, clamped > 0 {
+            let progress = NSBezierPath()
+            let endAngle = 90 - CGFloat(clamped) / 100 * 360
+            progress.appendArc(
+                withCenter: center,
+                radius: radius,
+                startAngle: 90,
+                endAngle: endAngle,
+                clockwise: true
+            )
+            progress.lineWidth = 2
+            progress.lineCapStyle = .round
+            NSColor(UsageLevel(remainingPercent: clamped)).setStroke()
+            progress.stroke()
         }
 
-        let number = percent.map(String.init) ?? "--"
+        let number = clamped.map(String.init) ?? "--"
+        let fontSize: CGFloat = number.count >= 3 ? 5.4 : 6.4
         let numberAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 5.8, weight: .bold),
+            .font: NSFont.monospacedDigitSystemFont(ofSize: fontSize, weight: .bold),
             .foregroundColor: NSColor.labelColor,
         ]
         let textSize = NSString(string: number).size(withAttributes: numberAttributes)
         NSString(string: number).draw(
-            at: NSPoint(x: center.x - textSize.width / 2, y: center.y - textSize.height / 2),
+            at: NSPoint(x: center.x - textSize.width / 2, y: center.y - textSize.height / 2 - 0.2),
             withAttributes: numberAttributes
         )
+    }
+}
+
+private struct ThinProgressBar: View {
+    let value: Int?
+    let tint: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.secondary.opacity(0.16))
+                Capsule()
+                    .fill(tint)
+                    .frame(width: proxy.size.width * CGFloat(clampedValue) / 100)
+            }
+        }
+        .frame(height: 5)
+        .accessibilityLabel("Remaining usage")
+        .accessibilityValue(value.map { "\($0)%" } ?? "Unknown")
+    }
+
+    private var clampedValue: Int {
+        min(100, max(0, value ?? 0))
+    }
+}
+
+struct CompactUsageBar: View {
+    let title: String
+    let window: UsageWindow?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text(window.map { "\($0.remainingPercent)%" } ?? "--")
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(color)
+                Text(resetDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            ThinProgressBar(value: window?.remainingPercent, tint: color)
+        }
+    }
+
+    private var color: Color {
+        guard let remaining = window?.remainingPercent else { return .secondary }
+        return Color(UsageLevel(remainingPercent: remaining))
+    }
+
+    private var resetDescription: String {
+        guard let reset = window?.resetsAt else { return "reset --" }
+        return "reset \(reset.formatted(date: .omitted, time: .shortened))"
     }
 }
 
