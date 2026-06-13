@@ -29,16 +29,21 @@ enum StatusItemImageFactory {
         let radius: CGFloat = 9
         let activeColor = NSColor.labelColor
         let trackColor = activeColor.withAlphaComponent(0.24)
+        let clamped = percent.map { min(100, max(0, $0)) }
+
+        if style == .dashed {
+            drawSegmentedRing(percent: clamped, center: center, radius: radius, activeColor: activeColor, trackColor: trackColor)
+            drawNumber(clamped, center: center)
+            return
+        }
 
         let track = NSBezierPath()
         track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
         track.lineWidth = 2.5
         track.lineCapStyle = .round
-        applyDashIfNeeded(to: track, style: style)
         trackColor.setStroke()
         track.stroke()
 
-        let clamped = percent.map { min(100, max(0, $0)) }
         if let clamped, clamped > 0 {
             let progress = NSBezierPath()
             let endAngle = 90 - CGFloat(clamped) / 100 * 360
@@ -51,11 +56,62 @@ enum StatusItemImageFactory {
             )
             progress.lineWidth = 2.5
             progress.lineCapStyle = .round
-            applyDashIfNeeded(to: progress, style: style)
             activeColor.setStroke()
             progress.stroke()
         }
 
+        drawNumber(clamped, center: center)
+    }
+
+    private static func drawSegmentedRing(
+        percent: Int?,
+        center: NSPoint,
+        radius: CGFloat,
+        activeColor: NSColor,
+        trackColor: NSColor
+    ) {
+        let segmentCount = 12
+        let segmentAngle = 360 / CGFloat(segmentCount)
+        let gapAngle: CGFloat = 18
+        let progress = CGFloat(percent ?? 0) / 100 * CGFloat(segmentCount)
+
+        for index in 0..<segmentCount {
+            let startAngle = 90 - CGFloat(index) * segmentAngle - gapAngle / 2
+            let endAngle = 90 - CGFloat(index + 1) * segmentAngle + gapAngle / 2
+            let sweepAngle = startAngle - endAngle
+            let activePortion = min(1, max(0, progress - CGFloat(index)))
+
+            let track = NSBezierPath()
+            track.appendArc(
+                withCenter: center,
+                radius: radius,
+                startAngle: startAngle,
+                endAngle: endAngle,
+                clockwise: true
+            )
+            track.lineWidth = 2.1
+            track.lineCapStyle = .round
+            trackColor.setStroke()
+            track.stroke()
+
+            guard activePortion > 0 else { continue }
+
+            let active = NSBezierPath()
+            active.appendArc(
+                withCenter: center,
+                radius: radius,
+                startAngle: startAngle,
+                endAngle: startAngle - sweepAngle * activePortion,
+                clockwise: true
+            )
+            active.lineWidth = 2.1
+            active.lineCapStyle = .round
+            activeColor.setStroke()
+            active.stroke()
+        }
+    }
+
+    private static func drawNumber(_ clamped: Int?, center: NSPoint) {
         let number = clamped.map(String.init) ?? "--"
         let fontSize: CGFloat = number.count >= 3 ? 6.6 : 8
         let numberAttributes: [NSAttributedString.Key: Any] = [
@@ -67,12 +123,6 @@ enum StatusItemImageFactory {
             at: NSPoint(x: center.x - textSize.width / 2, y: center.y - textSize.height / 2 - 0.2),
             withAttributes: numberAttributes
         )
-    }
-
-    private static func applyDashIfNeeded(to path: NSBezierPath, style: DialStyle) {
-        guard style == .dashed else { return }
-        var pattern: [CGFloat] = [2.3, 2.2]
-        path.setLineDash(&pattern, count: pattern.count, phase: 0)
     }
 }
 
