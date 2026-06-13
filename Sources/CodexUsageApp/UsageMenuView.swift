@@ -9,8 +9,8 @@ struct UsageMenuView: View {
             header
 
             if let snapshot = store.snapshot {
-                CompactUsageBar(title: "5h", window: snapshot.primary)
-                CompactUsageBar(title: "7d", window: snapshot.secondary)
+                CompactUsageBar(title: "5 小时", window: snapshot.primary, resetStyle: .timeOnly)
+                CompactUsageBar(title: "1 周", window: snapshot.secondary, resetStyle: .dateOnly)
                 footer(snapshot)
             } else {
                 emptyState

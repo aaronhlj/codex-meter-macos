@@ -103,6 +103,7 @@ private struct ThinProgressBar: View {
 struct CompactUsageBar: View {
     let title: String
     let window: UsageWindow?
+    let resetStyle: ResetDisplayStyle
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -128,8 +129,22 @@ struct CompactUsageBar: View {
     }
 
     private var resetDescription: String {
-        guard let reset = window?.resetsAt else { return "reset --" }
-        return "reset \(reset.formatted(date: .omitted, time: .shortened))"
+        guard let reset = window?.resetsAt else { return "--" }
+        return resetStyle.format(reset)
+    }
+}
+
+enum ResetDisplayStyle {
+    case timeOnly
+    case dateOnly
+
+    func format(_ date: Date) -> String {
+        switch self {
+        case .timeOnly:
+            date.formatted(date: .omitted, time: .shortened)
+        case .dateOnly:
+            date.formatted(.dateTime.month(.wide).day())
+        }
     }
 }
 
