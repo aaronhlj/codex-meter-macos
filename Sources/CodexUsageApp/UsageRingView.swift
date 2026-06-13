@@ -3,32 +3,39 @@ import CodexUsageCore
 import SwiftUI
 
 enum StatusItemMetrics {
-    static let width: CGFloat = 58
+    static let width: CGFloat = 50
     static let popoverSize = NSSize(width: 300, height: 250)
 }
 
 enum StatusItemImageFactory {
-    private static let imageSize = NSSize(width: 50, height: 22)
+    private static let imageSize = NSSize(width: 46, height: 22)
+    private enum DialStyle {
+        case dashed
+        case solid
+    }
 
     static func make(snapshot: UsageSnapshot?) -> NSImage {
         let image = NSImage(size: imageSize, flipped: false) { _ in
-            drawDial(percent: snapshot?.primary?.remainingPercent, centerX: 12)
-            drawDial(percent: snapshot?.secondary?.remainingPercent, centerX: 38)
+            drawDial(percent: snapshot?.primary?.remainingPercent, centerX: 11, style: .dashed)
+            drawDial(percent: snapshot?.secondary?.remainingPercent, centerX: 35, style: .solid)
             return true
         }
         image.isTemplate = false
         return image
     }
 
-    private static func drawDial(percent: Int?, centerX: CGFloat) {
+    private static func drawDial(percent: Int?, centerX: CGFloat, style: DialStyle) {
         let center = NSPoint(x: centerX, y: 11)
-        let radius: CGFloat = 8
+        let radius: CGFloat = 9
+        let activeColor = NSColor.labelColor
+        let trackColor = activeColor.withAlphaComponent(0.24)
 
         let track = NSBezierPath()
         track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
-        track.lineWidth = 2
+        track.lineWidth = 2.5
         track.lineCapStyle = .round
-        NSColor.secondaryLabelColor.withAlphaComponent(0.22).setStroke()
+        applyDashIfNeeded(to: track, style: style)
+        trackColor.setStroke()
         track.stroke()
 
         let clamped = percent.map { min(100, max(0, $0)) }
@@ -42,14 +49,15 @@ enum StatusItemImageFactory {
                 endAngle: endAngle,
                 clockwise: true
             )
-            progress.lineWidth = 2
+            progress.lineWidth = 2.5
             progress.lineCapStyle = .round
-            NSColor(UsageLevel(remainingPercent: clamped)).setStroke()
+            applyDashIfNeeded(to: progress, style: style)
+            activeColor.setStroke()
             progress.stroke()
         }
 
         let number = clamped.map(String.init) ?? "--"
-        let fontSize: CGFloat = number.count >= 3 ? 5.4 : 6.4
+        let fontSize: CGFloat = number.count >= 3 ? 6.6 : 8
         let numberAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(ofSize: fontSize, weight: .bold),
             .foregroundColor: NSColor.labelColor,
@@ -59,6 +67,12 @@ enum StatusItemImageFactory {
             at: NSPoint(x: center.x - textSize.width / 2, y: center.y - textSize.height / 2 - 0.2),
             withAttributes: numberAttributes
         )
+    }
+
+    private static func applyDashIfNeeded(to path: NSBezierPath, style: DialStyle) {
+        guard style == .dashed else { return }
+        var pattern: [CGFloat] = [2.3, 2.2]
+        path.setLineDash(&pattern, count: pattern.count, phase: 0)
     }
 }
 
